@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import os
 from werkzeug.utils import secure_filename
@@ -15,6 +15,13 @@ import pickle
 
 app = Flask(__name__)
 CORS(app)
+
+#serve from templates folder
+@app.route('/')
+def index():
+index.html from 'templates' folder
+	return
+render_template('index.html')
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'

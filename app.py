@@ -16,13 +16,6 @@ import pickle
 app = Flask(__name__)
 CORS(app)
 
-#serve from templates folder
-@app.route('/')
-def index():
-    #HTML from 'templates' folder
-	return
-render_template('index.html')
-
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt'}
@@ -33,6 +26,13 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('analysis', exist_ok=True)
 os.makedirs('predictions', exist_ok=True)
+
+#serve from templates folder
+@app.route('/')
+def index():
+    #HTML from 'templates' folder
+	return
+render_template('index.html')
 
 # Global storage for analysis data
 analysis_data = {

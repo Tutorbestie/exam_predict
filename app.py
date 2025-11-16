@@ -19,7 +19,7 @@ CORS(app)
 #serve from templates folder
 @app.route('/')
 def index():
-index.html from 'templates' folder
+    #HTML from 'templates' folder
 	return
 render_template('index.html')
 

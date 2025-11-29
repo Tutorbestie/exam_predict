@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import os
 from werkzeug.utils import secure_filename
@@ -7,11 +7,7 @@ import docx
 import json
 from datetime import datetime
 import numpy as np
-from collections import Counter
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import pickle
 
 app = Flask(__name__)
 CORS(app)
@@ -32,8 +28,7 @@ os.makedirs('predictions', exist_ok=True)
 @app.route('/')
 def index():
     #HTML from 'templates' folder
-	return
-render_template('index.html')
+    return render_template('index.html')
 
 # Global storage for analysis data
 analysis_data = {

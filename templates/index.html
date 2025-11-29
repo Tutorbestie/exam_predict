@@ -67,14 +67,15 @@
                         <h3 class="text-2xl font-semibold mb-2">Syllabus</h3>
                         <p class="text-gray-600">Upload the official syllabus for analysis (technical exams supported)</p>
                     </div>
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition">
+                    <div id="syllabus-upload-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition">
                         <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
                         <p class="mb-2">Drag & drop your syllabus file here</p>
                         <p class="text-sm text-gray-500 mb-4">Supports PDF, DOCX, TXT formats</p>
-                        <button class="bg-primary hover:bg-secondary text-white py-2 px-6 rounded-lg transition">
+                        <button onclick="document.getElementById('syllabus-input').click()" class="bg-primary hover:bg-secondary text-white py-2 px-6 rounded-lg transition">
                             Browse Files
                         </button>
-                        <input type="file" class="hidden" accept=".pdf,.docx,.txt">
+                        <input type="file" id="syllabus-input" class="hidden" accept=".pdf,.docx,.txt">
+                        <p id="syllabus-status" class="mt-3 text-sm font-medium hidden"></p>
                     </div>
                 </div>
 
@@ -85,21 +86,23 @@
                         <h3 class="text-2xl font-semibold mb-2">Previous Question Papers</h3>
                         <p class="text-gray-600">Upload past exam papers for pattern analysis</p>
                     </div>
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition">
+                    <div id="papers-upload-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition">
                         <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
                         <p class="mb-2">Drag & drop question papers here</p>
                         <p class="text-sm text-gray-500 mb-4">Supports PDF, DOCX, TXT formats</p>
-                        <button class="bg-primary hover:bg-secondary text-white py-2 px-6 rounded-lg transition">
+                        <button onclick="document.getElementById('papers-input').click()" class="bg-primary hover:bg-secondary text-white py-2 px-6 rounded-lg transition">
                             Browse Files
                         </button>
-                        <input type="file" class="hidden" accept=".pdf,.docx,.txt" multiple>
+                        <input type="file" id="papers-input" class="hidden" accept=".pdf,.docx,.txt" multiple>
+                        <p id="papers-status" class="mt-3 text-sm font-medium hidden"></p>
                     </div>
                 </div>
             </div>
             <div class="text-center mt-12">
-                <button class="bg-accent hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full text-lg transition transform hover:scale-105">
+                <button id="analyze-btn" onclick="analyzeData()" class="bg-accent hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full text-lg transition transform hover:scale-105">
                     Analyze Data
                 </button>
+                <p id="analyze-status" class="mt-4 text-sm font-medium hidden"></p>
             </div>
         </div>
     </section>
@@ -109,88 +112,28 @@
         <div class="container mx-auto px-4">
             <h2 class="text-3xl font-bold text-center mb-12 text-dark">Data Analysis</h2>
             <div class="max-w-4xl mx-auto">
-                <div class="bg-gray-50 rounded-xl p-6 mb-8">
-                    <h3 class="text-xl font-semibold mb-4">Syllabus Coverage Analysis</h3>
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span>Mathematics</span>
-                                <span>85%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-green-600 h-2.5 rounded-full" style="width: 85%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span>Reasoning</span>
-                                <span>72%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: 72%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span>English</span>
-                                <span>93%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-purple-600 h-2.5 rounded-full" style="width: 93%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span>General Knowledge</span>
-                                <span>65%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-yellow-500 h-2.5 rounded-full" style="width: 65%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span>Technical Subjects</span>
-                                <span>78%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-red-500 h-2.5 rounded-full" style="width: 78%"></div>
-                            </div>
-                        </div>
-                    </div>
+                <div id="no-analysis" class="text-center py-12">
+                    <p class="text-gray-600 text-lg">Upload syllabus and question papers, then click "Analyze Data" to see results</p>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="bg-gray-50 rounded-xl p-6">
-                        <h3 class="text-xl font-semibold mb-4">Topic Frequency</h3>
-                        <ul class="space-y-3">
-                            <li class="flex justify-between border-b pb-2">
-                                <span>Algebra</span>
-                                <span class="font-medium">24 questions</span>
-                            </li>
-                            <li class="flex justify-between border-b pb-2">
-                                <span>Data Interpretation</span>
-                                <span class="font-medium">18 questions</span>
-                            </li>
-                            <li class="flex justify-between border-b pb-2">
-                                <span>Electrical Circuits</span>
-                                <span class="font-medium">16 questions</span>
-                            </li>
-                            <li class="flex justify-between border-b pb-2">
-                                <span>Reading Comprehension</span>
-                                <span class="font-medium">12 questions</span>
-                            </li>
-                            <li class="flex justify-between">
-                                <span>Structural Analysis</span>
-                                <span class="font-medium">11 questions</span>
-                            </li>
-                        </ul>
+                <div id="analysis-content" class="hidden">
+                    <div class="bg-gray-50 rounded-xl p-6 mb-8">
+                        <h3 class="text-xl font-semibold mb-4">Syllabus Coverage Analysis</h3>
+                        <div id="coverage-analysis" class="space-y-4">
+                        </div>
                     </div>
 
-                    <div class="bg-gray-50 rounded-xl p-6">
-                        <h3 class="text-xl font-semibold mb-4">Difficulty Distribution</h3>
-                        <div class="flex items-center justify-center">
-                            <canvas id="difficultyChart" width="200" height="200"></canvas>
+                    <div id="topic-frequency" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h3 class="text-xl font-semibold mb-4">Topic Frequency</h3>
+                            <ul id="topic-list" class="space-y-3">
+                            </ul>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h3 class="text-xl font-semibold mb-4">Difficulty Distribution</h3>
+                            <div class="flex items-center justify-center">
+                                <canvas id="difficultyChart" width="200" height="200"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -202,14 +145,15 @@
     <section id="prediction" class="py-16 bg-light">
         <div class="container mx-auto px-4">
             <h2 class="text-3xl font-bold text-center mb-12 text-dark">Predicted Question Paper</h2>
-            <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
-                <div class="p-6 border-b">
-                    <h3 class="text-xl font-semibold">Most Probable Questions for Upcoming Exam</h3>
-                    <p class="text-gray-600">Based on analysis of 15 previous question papers and current syllabus</p>
-                </div>
+                <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+                <div id="prediction-content" class="hidden">
+                    <div class="p-6 border-b">
+                        <h3 class="text-xl font-semibold">Most Probable Questions for Upcoming Exam</h3>
+                        <p id="prediction-description" class="text-gray-600">Based on analysis of previous question papers and current syllabus</p>
+                    </div>
                 
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
@@ -218,68 +162,19 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Probability</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">Quantitative Aptitude</td>
-                                <td class="px-6 py-4 whitespace-nowrap">Time & Work</td>
-                                <td class="px-6 py-4 whitespace-nowrap">MCQ (1 mark)</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                        92%
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">Logical Reasoning</td>
-                                <td class="px-6 py-4 whitespace-nowrap">Seating Arrangement</td>
-                                <td class="px-6 py-4 whitespace-nowrap">MCQ (1 mark)</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                        87%
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">Electrical Engineering</td>
-                                <td class="px-6 py-4 whitespace-nowrap">Network Theorems</td>
-                                <td class="px-6 py-4 whitespace-nowrap">MCQ (1 mark)</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                        88%
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">Civil Engineering</td>
-                                <td class="px-6 py-4 whitespace-nowrap">Structural Analysis</td>
-                                <td class="px-6 py-4 whitespace-nowrap">MCQ (1 mark)</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                        82%
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">Mechanical Engineering</td>
-                                <td class="px-6 py-4 whitespace-nowrap">Thermodynamics</td>
-                                <td class="px-6 py-4 whitespace-nowrap">MCQ (1 mark)</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                        76%
-                                    </span>
-                                </td>
-                            </tr>
+                        <tbody id="predictions-table-body" class="bg-white divide-y divide-gray-200">
                         </tbody>
                     </table>
                 </div>
                 
-                <div class="p-6 bg-gray-50">
-                    <button class="bg-primary hover:bg-secondary text-white font-bold py-3 px-6 rounded-lg transition">
-                        Download Full Predicted Paper (PDF)
-                    </button>
-                    <button class="ml-4 bg-accent hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition">
-                        Generate Practice Test
-                    </button>
+                    <div class="p-6 bg-gray-50">
+                        <button onclick="downloadPrediction()" class="bg-primary hover:bg-secondary text-white font-bold py-3 px-6 rounded-lg transition">
+                            Download Full Predicted Paper (PDF)
+                        </button>
+                    </div>
+                </div>
+                <div id="no-predictions" class="text-center py-12">
+                    <p class="text-gray-600 text-lg">Upload syllabus and question papers, then analyze to see predictions</p>
                 </div>
             </div>
         </div>
@@ -416,7 +311,13 @@
         </div>
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        const API_BASE = window.location.origin;
+        let difficultyChart = null;
+        let syllabusFile = null;
+        let questionPapers = [];
+
         // Smooth scrolling for navigation links
         function scrollToSection(sectionId) {
             document.getElementById(sectionId).scrollIntoView({
@@ -424,53 +325,244 @@
             });
         }
 
-        // Chart initialization
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Difficulty distribution chart (simplified)
+            setupFileUploads();
+            checkStatus();
+        });
+
+        function setupFileUploads() {
+            // Syllabus upload
+            const syllabusInput = document.getElementById('syllabus-input');
+            syllabusInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    syllabusFile = this.files[0];
+                    uploadSyllabus(syllabusFile);
+                }
+            });
+
+            // Question papers upload
+            const papersInput = document.getElementById('papers-input');
+            papersInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    questionPapers = Array.from(this.files);
+                    uploadQuestionPapers(questionPapers);
+                }
+            });
+        }
+
+        async function uploadSyllabus(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const statusEl = document.getElementById('syllabus-status');
+            statusEl.textContent = 'Uploading syllabus...';
+            statusEl.className = 'mt-3 text-sm font-medium text-blue-600';
+            statusEl.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/upload/syllabus`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusEl.textContent = `✓ Syllabus uploaded: ${data.filename}`;
+                    statusEl.className = 'mt-3 text-sm font-medium text-green-600';
+                    document.getElementById('syllabus-upload-area').classList.add('border-green-500');
+                } else {
+                    statusEl.textContent = `✗ Error: ${data.error}`;
+                    statusEl.className = 'mt-3 text-sm font-medium text-red-600';
+                }
+            } catch (error) {
+                statusEl.textContent = `✗ Upload failed: ${error.message}`;
+                statusEl.className = 'mt-3 text-sm font-medium text-red-600';
+            }
+        }
+
+        async function uploadQuestionPapers(files) {
+            const formData = new FormData();
+            files.forEach(file => formData.append('files', file));
+            
+            const statusEl = document.getElementById('papers-status');
+            statusEl.textContent = `Uploading ${files.length} file(s)...`;
+            statusEl.className = 'mt-3 text-sm font-medium text-blue-600';
+            statusEl.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/upload/question-papers`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusEl.textContent = `✓ ${data.count} question paper(s) uploaded successfully`;
+                    statusEl.className = 'mt-3 text-sm font-medium text-green-600';
+                    document.getElementById('papers-upload-area').classList.add('border-green-500');
+                } else {
+                    statusEl.textContent = `✗ Error: ${data.error}`;
+                    statusEl.className = 'mt-3 text-sm font-medium text-red-600';
+                }
+            } catch (error) {
+                statusEl.textContent = `✗ Upload failed: ${error.message}`;
+                statusEl.className = 'mt-3 text-sm font-medium text-red-600';
+            }
+        }
+
+        async function analyzeData() {
+            const statusEl = document.getElementById('analyze-status');
+            const analyzeBtn = document.getElementById('analyze-btn');
+            
+            statusEl.textContent = 'Analyzing data...';
+            statusEl.className = 'mt-4 text-sm font-medium text-blue-600';
+            statusEl.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/analyze`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusEl.textContent = '✓ Analysis complete!';
+                    statusEl.className = 'mt-4 text-sm font-medium text-green-600';
+                    displayAnalysis(data.analysis);
+                    await generatePredictions();
+                } else {
+                    statusEl.textContent = `✗ Error: ${data.error}`;
+                    statusEl.className = 'mt-4 text-sm font-medium text-red-600';
+                }
+            } catch (error) {
+                statusEl.textContent = `✗ Analysis failed: ${error.message}`;
+                statusEl.className = 'mt-4 text-sm font-medium text-red-600';
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        function displayAnalysis(analysis) {
+            document.getElementById('no-analysis').classList.add('hidden');
+            document.getElementById('analysis-content').classList.remove('hidden');
+            
+            // Display syllabus coverage
+            const coverageHtml = Object.entries(analysis.syllabus_coverage).map(([subject, percentage]) => {
+                const colorClass = percentage >= 80 ? 'bg-green-600' : percentage >= 60 ? 'bg-blue-600' : 'bg-yellow-500';
+                return `
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span>${subject}</span>
+                            <span>${percentage}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="${colorClass} h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('coverage-analysis').innerHTML = coverageHtml;
+
+            // Display topic frequency
+            const topicHtml = analysis.topic_frequency.map((item, index, arr) => `
+                <li class="flex justify-between ${index < arr.length - 1 ? 'border-b pb-2' : ''}">
+                    <span>${item.topic}</span>
+                    <span class="font-medium">${item.count} occurrence(s)</span>
+                </li>
+            `).join('');
+            document.getElementById('topic-list').innerHTML = topicHtml;
+
+            // Update difficulty chart
+            if (difficultyChart) {
+                difficultyChart.destroy();
+            }
             const ctx = document.getElementById('difficultyChart').getContext('2d');
-            new Chart(ctx, {
+            const dist = analysis.difficulty_distribution;
+            difficultyChart = new Chart(ctx, {
                 type: 'pie',
                 data: {
                     labels: ['Easy', 'Medium', 'Hard'],
                     datasets: [{
-                        data: [30, 50, 20],
-                        backgroundColor: [
-                            '#10B981',
-                            '#F59E0B',
-                            '#EF4444'
-                        ]
+                        data: [dist.Easy, dist.Medium, dist.Hard],
+                        backgroundColor: ['#10B981', '#F59E0B', '#EF4444']
                     }]
                 },
                 options: {
                     responsive: true,
                     plugins: {
-                        legend: {
-                            position: 'right',
-                        }
+                        legend: { position: 'right' }
                     }
                 }
             });
-        });
+        }
 
-        // File upload simulation
-        document.querySelectorAll('input[type="file"]').forEach(input => {
-            input.addEventListener('change', function() {
-                if (this.files.length > 0) {
-                    const fileName = this.files[0].name;
-                    const parent = this.parentElement;
-                    parent.innerHTML = `
-                        <i class="fas fa-check-circle text-3xl text-green-500 mb-3"></i>
-                        <p class="mb-2 text-green-600 font-medium">File uploaded successfully!</p>
-                        <p class="text-sm text-gray-600 mb-4">${fileName}</p>
-                        <button class="bg-primary hover:bg-secondary text-white py-2 px-6 rounded-lg transition">
-                            Change File
-                        </button>
-                    `;
-                    parent.classList.add('border-green-500');
+        async function generatePredictions() {
+            try {
+                const response = await fetch(`${API_BASE}/api/predict`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayPredictions(data.predictions, data.papers_analyzed);
                 }
-            });
-        });
+            } catch (error) {
+                console.error('Prediction failed:', error);
+            }
+        }
+
+        function displayPredictions(predictions, papersCount) {
+            document.getElementById('prediction-content').classList.remove('hidden');
+            document.getElementById('no-predictions').classList.add('hidden');
+            document.getElementById('prediction-description').textContent = 
+                `Based on analysis of ${papersCount} previous question paper(s) and current syllabus`;
+            
+            const tbody = document.getElementById('predictions-table-body');
+            tbody.innerHTML = predictions.map(pred => {
+                const probColor = pred.probability >= 80 ? 'bg-green-100 text-green-800' : 
+                                 pred.probability >= 60 ? 'bg-yellow-100 text-yellow-800' : 
+                                 'bg-orange-100 text-orange-800';
+                return `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">${pred.subject}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${pred.topic}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${pred.question_type}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${probColor}">
+                                ${pred.probability}%
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            scrollToSection('prediction');
+        }
+
+        async function downloadPrediction() {
+            try {
+                const response = await fetch(`${API_BASE}/api/download-prediction`);
+                const data = await response.json();
+                alert('PDF generation feature coming soon! Predictions are available in the table above.');
+            } catch (error) {
+                alert('Download failed: ' + error.message);
+            }
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/status`);
+                const data = await response.json();
+                if (data.syllabus_uploaded || data.question_papers_count > 0) {
+                    // Update UI to show existing data
+                }
+            } catch (error) {
+                console.error('Status check failed:', error);
+            }
+        }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

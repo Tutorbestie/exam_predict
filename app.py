@@ -159,19 +159,31 @@ def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
     """Generate predicted questions based on analysis"""
     predictions = []
     
+    if not question_paper_topics or len(question_paper_topics) == 0:
+        return predictions
+    
     for subject in question_paper_topics:
+        if not question_paper_topics[subject] or len(question_paper_topics[subject]) == 0:
+            continue
+            
         for topic, count in question_paper_topics[subject].items():
             # Check if topic is in syllabus
-            syllabus_match = 0
-            if subject in syllabus_topics:
-                syllabus_match = 1 if any(t['topic'] == topic for t in syllabus_topics[subject]) else 0.5
+            syllabus_match = 0.5  # Default to 0.5 if not in syllabus
+            if subject in syllabus_topics and syllabus_topics[subject]:
+                # Check if topic matches any syllabus topic (case-insensitive)
+                topic_lower = topic.lower()
+                if any(t.get('topic', '').lower() == topic_lower for t in syllabus_topics[subject]):
+                    syllabus_match = 1.0
+                else:
+                    syllabus_match = 0.5
             
             probability = calculate_prediction_probability(count, num_papers, syllabus_match)
             
-            if probability > 50:  # Only include predictions with >50% probability
+            # Lower threshold to 30% to get more predictions
+            if probability >= 30:
                 predictions.append({
                     'subject': subject,
-                    'topic': topic.title(),
+                    'topic': topic.title() if topic else 'Unknown',
                     'frequency': count,
                     'probability': round(probability, 1),
                     'question_type': 'MCQ (1 mark)' if probability > 70 else 'MCQ (2 marks)'
@@ -180,7 +192,8 @@ def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
     # Sort by probability
     predictions.sort(key=lambda x: x['probability'], reverse=True)
     
-    return predictions[:20]  # Return top 20 predictions
+    # Return top 20, or all if less than 20
+    return predictions[:20]
 
 @app.route('/api/upload/syllabus', methods=['POST'])
 def upload_syllabus():
@@ -325,22 +338,36 @@ def predict_questions():
     if not analysis_data['syllabus'] or not analysis_data['question_papers']:
         return jsonify({'error': 'Please upload and analyze data first'}), 400
     
-    syllabus_topics = analysis_data['syllabus']['topics']
-    question_paper_topics = analysis_data['topics']
+    if not analysis_data.get('topics'):
+        return jsonify({'error': 'Please run analysis first to identify topics'}), 400
+    
+    syllabus_topics = analysis_data['syllabus'].get('topics', {})
+    question_paper_topics = analysis_data.get('topics', {})
     num_papers = len(analysis_data['question_papers'])
+    
+    # Debug info
+    print(f"Generating predictions with {num_papers} papers")
+    print(f"Syllabus topics: {list(syllabus_topics.keys())}")
+    print(f"Question paper topics: {list(question_paper_topics.keys())}")
     
     predictions = generate_predictions(syllabus_topics, question_paper_topics, num_papers)
     
+    print(f"Generated {len(predictions)} predictions")
+    
     # Save predictions
     prediction_file = f"predictions/prediction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(prediction_file, 'w') as f:
-        json.dump(predictions, f, indent=2)
+    try:
+        with open(prediction_file, 'w') as f:
+            json.dump(predictions, f, indent=2)
+    except Exception as e:
+        print(f"Error saving prediction file: {e}")
     
     return jsonify({
         'success': True,
         'predictions': predictions,
         'total_predictions': len(predictions),
-        'papers_analyzed': num_papers
+        'papers_analyzed': num_papers,
+        'message': f'Generated {len(predictions)} predictions from {num_papers} paper(s)'
     }), 200
 
 @app.route('/api/download-prediction', methods=['GET'])

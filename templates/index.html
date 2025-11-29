@@ -174,6 +174,7 @@
                     </div>
                 </div>
                 <div id="no-predictions" class="text-center py-12">
+                    <i class="fas fa-info-circle text-4xl text-gray-400 mb-4"></i>
                     <p class="text-gray-600 text-lg">Upload syllabus and question papers, then analyze to see predictions</p>
                 </div>
             </div>
@@ -430,8 +431,12 @@
                 if (response.ok) {
                     statusEl.textContent = '✓ Analysis complete!';
                     statusEl.className = 'mt-4 text-sm font-medium text-green-600';
+                    console.log('Analysis data received:', data);
                     displayAnalysis(data.analysis);
-                    await generatePredictions();
+                    // Wait a bit before generating predictions to ensure data is saved
+                    setTimeout(async () => {
+                        await generatePredictions();
+                    }, 500);
                 } else {
                     statusEl.textContent = `✗ Error: ${data.error}`;
                     statusEl.className = 'mt-4 text-sm font-medium text-red-600';
@@ -506,19 +511,48 @@
                 });
                 const data = await response.json();
                 
+                console.log('Prediction response:', data);
+                
                 if (response.ok) {
-                    displayPredictions(data.predictions, data.papers_analyzed);
+                    if (data.predictions && data.predictions.length > 0) {
+                        displayPredictions(data.predictions, data.papers_analyzed);
+                    } else {
+                        console.warn('No predictions returned');
+                        showPredictionError('No predictions generated. The analysis may not have found enough matching topics.');
+                    }
+                } else {
+                    showPredictionError(`Error: ${data.error || 'Failed to generate predictions'}`);
                 }
             } catch (error) {
                 console.error('Prediction failed:', error);
+                showPredictionError(`Prediction failed: ${error.message}`);
             }
+        }
+        
+        function showPredictionError(message) {
+            const noPredictions = document.getElementById('no-predictions');
+            noPredictions.innerHTML = `
+                <div class="text-center py-12">
+                    <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+                    <p class="text-gray-700 text-lg font-medium mb-2">${message}</p>
+                    <p class="text-gray-600 text-sm">Please try uploading different files or check that your files contain relevant topic keywords.</p>
+                </div>
+            `;
+            noPredictions.classList.remove('hidden');
+            document.getElementById('prediction-content').classList.add('hidden');
         }
 
         function displayPredictions(predictions, papersCount) {
+            if (!predictions || predictions.length === 0) {
+                showPredictionError('No predictions were generated. This might happen if the uploaded files don\'t contain matching topics, or if the analysis threshold is too high.');
+                return;
+            }
+            
+            console.log(`Displaying ${predictions.length} predictions`);
             document.getElementById('prediction-content').classList.remove('hidden');
             document.getElementById('no-predictions').classList.add('hidden');
             document.getElementById('prediction-description').textContent = 
-                `Based on analysis of ${papersCount} previous question paper(s) and current syllabus`;
+                `Based on analysis of ${papersCount || 0} previous question paper(s) and current syllabus`;
             
             const tbody = document.getElementById('predictions-table-body');
             tbody.innerHTML = predictions.map(pred => {
@@ -527,12 +561,12 @@
                                  'bg-orange-100 text-orange-800';
                 return `
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">${pred.subject}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${pred.topic}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${pred.question_type}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${pred.subject || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${pred.topic || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${pred.question_type || 'MCQ'}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${probColor}">
-                                ${pred.probability}%
+                                ${pred.probability || 0}%
                             </span>
                         </td>
                     </tr>

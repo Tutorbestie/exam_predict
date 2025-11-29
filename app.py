@@ -12,16 +12,6 @@ import re
 app = Flask(__name__)
 CORS(app)
 
-<<<<<<< Updated upstream
-=======
-#serve from templates folder
-@app.route('/')
-def index():
-    #HTML file is served from 'templates' folder
-    return
-render_template('index.html')
-
->>>>>>> Stashed changes
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt'}

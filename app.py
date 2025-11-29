@@ -86,88 +86,146 @@ def extract_text(file_path):
         return extract_text_from_txt(file_path)
     return ""
 
+def extract_topics_from_syllabus(text):
+    """Extract actual topics from syllabus by looking for structured content"""
+    topics_found = []
+    text_lines = text.split('\n')
+    
+    # Look for numbered/bulleted lists (common in syllabi)
+    for line in text_lines:
+        line = line.strip()
+        # Match patterns like: "1. Topic Name", "• Topic", "- Topic", "(a) Topic"
+        if re.match(r'^[\d\.•\-\*\(\)a-z\)]+[\.\)]\s*([A-Z][^\n]{5,100})', line):
+            match = re.match(r'^[\d\.•\-\*\(\)a-z\)]+[\.\)]\s*(.+)', line)
+            if match:
+                topic = match.group(1).strip()
+                # Clean up topic name
+                topic = re.sub(r'^\d+[\.\)]\s*', '', topic)
+                topic = re.sub(r'^[•\-\*]\s*', '', topic)
+                if len(topic) > 5 and len(topic) < 150:
+                    topics_found.append(topic)
+        # Match lines that start with capital letters and contain subject-like terms
+        elif re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*', line) and len(line) < 150:
+            # Check if it looks like a topic (not too long, not too short, contains letters)
+            if 10 < len(line) < 150 and line[0].isupper():
+                topics_found.append(line)
+    
+    # Also extract from question papers - look for question patterns
+    question_patterns = []
+    # Match questions like "Q1. What is...", "Question 1:", etc.
+    for line in text_lines:
+        line = line.strip()
+        if re.match(r'^(?:Q|Question)\s*\d+[\.\):]?\s*(.+)', line, re.IGNORECASE):
+            match = re.match(r'^(?:Q|Question)\s*\d+[\.\):]?\s*(.+)', line, re.IGNORECASE)
+            if match and len(match.group(1)) > 10:
+                question_patterns.append(match.group(1)[:100])
+    
+    return topics_found, question_patterns
+
 def extract_keywords_from_text(text):
     """Extract important keywords/phrases from text as topics"""
     # Remove common words
-    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how'}
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'question', 'answer', 'following', 'given', 'find', 'calculate', 'determine', 'solve'}
     
-    # Extract words (2-4 words) that might be topics
-    words = re.findall(r'\b[a-z]{3,}\b', text.lower())
-    # Filter out stop words and count frequencies
-    filtered_words = [w for w in words if w not in stop_words and len(w) > 3]
+    # Extract meaningful phrases (3-6 words) that are likely topics
+    # Look for capitalized phrases
+    capitalized_phrases = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b', text)
+    phrase_freq = Counter([p.lower() for p in capitalized_phrases if len(p.split()) >= 2])
+    
+    # Extract words
+    words = re.findall(r'\b[a-z]{4,}\b', text.lower())
+    filtered_words = [w for w in words if w not in stop_words and len(w) > 4]
     word_freq = Counter(filtered_words)
     
-    # Also extract common phrases (2-3 word combinations)
-    phrases = re.findall(r'\b[a-z]+ [a-z]+(?:\s+[a-z]+)?\b', text.lower())
-    phrase_freq = Counter([p for p in phrases if len(p.split()) >= 2 and not any(sw in p.split() for sw in stop_words)])
-    
-    # Combine and get top keywords
+    # Combine
     all_keywords = {}
-    for word, count in word_freq.most_common(50):
-        if count > 2:  # Only include if appears more than twice
-            all_keywords[word] = count
     for phrase, count in phrase_freq.most_common(30):
         if count > 1:
             all_keywords[phrase] = count
+    for word, count in word_freq.most_common(30):
+        if count > 3:  # Only if appears multiple times
+            all_keywords[word] = count
     
     return all_keywords
 
 def identify_subjects(text):
-    """Identify subjects and topics from text - improved version"""
-    subjects = {
-        'Mathematics': ['algebra', 'calculus', 'geometry', 'trigonometry', 'statistics', 'probability', 'differential', 'linear', 'equation', 'matrix', 'derivative', 'integral'],
-        'Reasoning': ['logical', 'verbal', 'reasoning', 'analytical', 'seating', 'arrangement', 'blood', 'relations', 'coding', 'decoding'],
-        'English': ['grammar', 'vocabulary', 'comprehension', 'reading', 'sentence', 'synonyms', 'antonyms', 'passage'],
-        'General Knowledge': ['history', 'geography', 'polity', 'economy', 'current', 'affairs', 'science', 'awareness'],
+    """Identify subjects and topics from text - extract actual topics from syllabus"""
+    # First try to extract structured topics from syllabus
+    syllabus_topics, question_patterns = extract_topics_from_syllabus(text)
+    
+    # Subject keywords for categorization
+    subject_keywords = {
+        'Mathematics': ['algebra', 'calculus', 'geometry', 'trigonometry', 'statistics', 'probability', 'differential', 'linear', 'equation', 'matrix', 'derivative', 'integral', 'function', 'theorem', 'proof'],
+        'Reasoning': ['logical', 'verbal', 'reasoning', 'analytical', 'seating', 'arrangement', 'blood', 'relations', 'coding', 'decoding', 'puzzle'],
+        'English': ['grammar', 'vocabulary', 'comprehension', 'reading', 'sentence', 'synonyms', 'antonyms', 'passage', 'essay', 'writing'],
+        'General Knowledge': ['history', 'geography', 'polity', 'economy', 'current', 'affairs', 'science', 'awareness', 'government'],
         'Quantitative Aptitude': ['time', 'work', 'speed', 'distance', 'percentage', 'profit', 'loss', 'interest', 'ratio', 'proportion', 'interpretation'],
-        'Electrical Engineering': ['network', 'theorem', 'circuit', 'electrical', 'machine', 'power', 'system', 'control', 'electromagnetic', 'analog', 'digital', 'electronics', 'signal'],
-        'Civil Engineering': ['structural', 'analysis', 'strength', 'material', 'fluid', 'mechanics', 'surveying', 'concrete', 'geotechnical', 'transportation', 'environmental'],
-        'Mechanical Engineering': ['thermodynamics', 'heat', 'transfer', 'fluid', 'manufacturing', 'process', 'theory', 'machine', 'design', 'mechanics'],
-        'Computer Science': ['data', 'structure', 'algorithm', 'operating', 'system', 'database', 'network', 'programming', 'software', 'intelligence'],
-        'Electronics Engineering': ['analog', 'digital', 'electronics', 'microprocessor', 'communication', 'vlsi', 'embedded', 'signal', 'processing']
+        'Electrical Engineering': ['network', 'theorem', 'circuit', 'electrical', 'machine', 'power', 'system', 'control', 'electromagnetic', 'analog', 'digital', 'electronics', 'signal', 'transformer', 'motor', 'generator'],
+        'Civil Engineering': ['structural', 'analysis', 'strength', 'material', 'fluid', 'mechanics', 'surveying', 'concrete', 'geotechnical', 'transportation', 'environmental', 'beam', 'column', 'foundation'],
+        'Mechanical Engineering': ['thermodynamics', 'heat', 'transfer', 'fluid', 'manufacturing', 'process', 'theory', 'machine', 'design', 'mechanics', 'engine', 'pump'],
+        'Computer Science': ['data', 'structure', 'algorithm', 'operating', 'system', 'database', 'network', 'programming', 'software', 'intelligence', 'array', 'tree', 'graph'],
+        'Electronics Engineering': ['analog', 'digital', 'electronics', 'microprocessor', 'communication', 'vlsi', 'embedded', 'signal', 'processing', 'semiconductor']
     }
     
     text_lower = text.lower()
     subject_counts = {}
     topic_mapping = {}
-    extracted_keywords = extract_keywords_from_text(text)
     
-    # Check for predefined topics
-    for subject, keywords in subjects.items():
-        count = 0
-        found_topics = []
-        for keyword in keywords:
-            # More flexible matching - word boundaries or as part of words
-            pattern = r'\b' + re.escape(keyword) + r's?\b'
-            matches = len(re.findall(pattern, text_lower))
-            if matches > 0:
-                count += matches
-                found_topics.append({'topic': keyword, 'count': matches})
+    # Categorize extracted syllabus topics
+    for topic in syllabus_topics[:50]:  # Limit to 50 topics
+        topic_lower = topic.lower()
+        # Find which subject this topic belongs to
+        matched_subject = None
+        max_matches = 0
         
-        if count > 0:
-            subject_counts[subject] = count
-            topic_mapping[subject] = found_topics
+        for subject, keywords in subject_keywords.items():
+            matches = sum(1 for kw in keywords if kw in topic_lower)
+            if matches > max_matches:
+                max_matches = matches
+                matched_subject = subject
+        
+        # If no match, assign to General
+        if not matched_subject:
+            matched_subject = 'General Topics'
+        
+        if matched_subject not in topic_mapping:
+            topic_mapping[matched_subject] = []
+            subject_counts[matched_subject] = 0
+        
+        # Add topic if not already there
+        existing_topics = [t['topic'] for t in topic_mapping[matched_subject]]
+        if topic not in existing_topics:
+            topic_mapping[matched_subject].append({'topic': topic, 'count': 1})
+            subject_counts[matched_subject] += 1
     
-    # If no predefined topics found, use extracted keywords and assign to "General" or relevant subjects
-    if not topic_mapping and extracted_keywords:
-        # Assign keywords to a general category
-        topic_mapping['General Topics'] = [{'topic': kw, 'count': cnt} for kw, cnt in list(extracted_keywords.items())[:20]]
-        subject_counts['General Topics'] = sum(cnt for cnt in extracted_keywords.values())
-    
-    # Also add top extracted keywords to existing subjects
-    if extracted_keywords:
-        for subject in topic_mapping.keys():
-            if subject not in ['General Topics']:
-                # Add relevant extracted keywords
-                for kw, cnt in list(extracted_keywords.items())[:5]:
-                    if kw not in [t['topic'] for t in topic_mapping[subject]]:
-                        topic_mapping[subject].append({'topic': kw, 'count': cnt})
+    # If no structured topics found, fall back to keyword extraction
+    if not topic_mapping:
+        extracted_keywords = extract_keywords_from_text(text)
+        if extracted_keywords:
+            # Categorize keywords
+            for kw, cnt in list(extracted_keywords.items())[:30]:
+                matched_subject = None
+                for subject, keywords in subject_keywords.items():
+                    if any(k in kw for k in keywords):
+                        matched_subject = subject
+                        break
+                
+                if not matched_subject:
+                    matched_subject = 'General Topics'
+                
+                if matched_subject not in topic_mapping:
+                    topic_mapping[matched_subject] = []
+                    subject_counts[matched_subject] = 0
+                
+                topic_mapping[matched_subject].append({'topic': kw.title(), 'count': cnt})
+                subject_counts[matched_subject] += cnt
     
     return subject_counts, topic_mapping
 
 def analyze_question_patterns(question_papers):
-    """Analyze patterns across multiple question papers"""
+    """Analyze patterns across multiple question papers - uses actual data"""
     all_topics = {}
+    total_questions = 0
     difficulty_distribution = {'Easy': 0, 'Medium': 0, 'Hard': 0}
     
     for paper in question_papers:
@@ -175,7 +233,15 @@ def analyze_question_patterns(question_papers):
         if not text:
             continue
             
+        # Extract topics from this paper
         subjects, topics = identify_subjects(text)
+        
+        # Count questions in the paper
+        question_count = len(re.findall(r'(?:Q|Question)\s*\d+', text, re.IGNORECASE))
+        if question_count == 0:
+            # Try alternative patterns
+            question_count = len(re.findall(r'\d+[\.\)]\s+[A-Z]', text)) or len(text.split('?')) - 1
+        total_questions += max(question_count, 1)
         
         # Aggregate topics
         for subject, subject_topics in topics.items():
@@ -190,10 +256,42 @@ def analyze_question_patterns(question_papers):
                             all_topics[subject][topic] = 0
                         all_topics[subject][topic] += count
         
-        # Simulate difficulty distribution (in real implementation, use ML model)
-        difficulty_distribution['Easy'] += np.random.randint(10, 20)
-        difficulty_distribution['Medium'] += np.random.randint(15, 25)
-        difficulty_distribution['Hard'] += np.random.randint(5, 15)
+        # Estimate difficulty based on question length and complexity
+        # Longer questions with technical terms = harder
+        avg_question_length = len(text) / max(question_count, 1) if question_count > 0 else 0
+        technical_terms = len(re.findall(r'\b(?:calculate|determine|solve|prove|derive|analyze|design)\b', text, re.IGNORECASE))
+        
+        if technical_terms > 5 or avg_question_length > 200:
+            difficulty_distribution['Hard'] += question_count // 2
+            difficulty_distribution['Medium'] += question_count // 3
+            difficulty_distribution['Easy'] += question_count - (question_count // 2) - (question_count // 3)
+        elif technical_terms > 2 or avg_question_length > 100:
+            difficulty_distribution['Medium'] += question_count // 2
+            difficulty_distribution['Easy'] += question_count // 2
+            difficulty_distribution['Hard'] += question_count - (question_count // 2) - (question_count // 2)
+        else:
+            difficulty_distribution['Easy'] += question_count // 2
+            difficulty_distribution['Medium'] += question_count // 3
+            difficulty_distribution['Hard'] += question_count - (question_count // 2) - (question_count // 3)
+    
+    # Normalize difficulty distribution if we have total questions
+    if total_questions > 0:
+        total_dist = sum(difficulty_distribution.values())
+        if total_dist == 0:
+            # Default distribution
+            difficulty_distribution = {
+                'Easy': int(total_questions * 0.4),
+                'Medium': int(total_questions * 0.4),
+                'Hard': int(total_questions * 0.2)
+            }
+        else:
+            # Scale to match total questions
+            scale = total_questions / total_dist
+            difficulty_distribution = {
+                'Easy': int(difficulty_distribution['Easy'] * scale),
+                'Medium': int(difficulty_distribution['Medium'] * scale),
+                'Hard': int(difficulty_distribution['Hard'] * scale)
+            }
     
     # If no topics found, extract keywords from all papers
     if not all_topics:
@@ -214,44 +312,100 @@ def calculate_prediction_probability(topic_count, total_papers, syllabus_match):
     return min(probability, 99)  # Cap at 99%
 
 def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
-    """Generate predicted questions based on analysis"""
+    """Generate predicted question topics based on analysis - focuses on matching syllabus"""
     predictions = []
     
-    if not question_paper_topics or len(question_paper_topics) == 0:
-        return predictions
+    # Priority: If syllabus exists, prioritize topics that are in syllabus
+    syllabus_topic_list = {}
+    if syllabus_topics:
+        for subject, topic_list in syllabus_topics.items():
+            if isinstance(topic_list, list):
+                syllabus_topic_list[subject] = [t.get('topic', '').lower() if isinstance(t, dict) else str(t).lower() for t in topic_list]
+            else:
+                syllabus_topic_list[subject] = []
     
+    if not question_paper_topics or len(question_paper_topics) == 0:
+        # If no QP topics but syllabus exists, use syllabus topics
+        if syllabus_topics:
+            for subject, topic_list in syllabus_topics.items():
+                if isinstance(topic_list, list):
+                    for topic_item in topic_list[:20]:
+                        topic_name = topic_item.get('topic', '') if isinstance(topic_item, dict) else str(topic_item)
+                        if topic_name:
+                            predictions.append({
+                                'subject': subject,
+                                'topic': topic_name.title() if isinstance(topic_name, str) else str(topic_name),
+                                'frequency': topic_item.get('count', 1) if isinstance(topic_item, dict) else 1,
+                                'probability': 85.0,  # High probability for syllabus topics
+                                'question_type': 'MCQ (1 mark)'
+                            })
+        return predictions[:20]
+    
+    # Generate predictions from question paper topics, prioritizing syllabus matches
     for subject in question_paper_topics:
         if not question_paper_topics[subject] or len(question_paper_topics[subject]) == 0:
             continue
-            
-        for topic, count in question_paper_topics[subject].items():
-            # Check if topic is in syllabus
-            syllabus_match = 0.5  # Default to 0.5 if not in syllabus
-            if subject in syllabus_topics and syllabus_topics[subject]:
-                # Check if topic matches any syllabus topic (case-insensitive)
-                topic_lower = topic.lower()
-                if any(t.get('topic', '').lower() == topic_lower for t in syllabus_topics[subject]):
-                    syllabus_match = 1.0
+        
+        # Get syllabus topics for this subject
+        syllabus_subject_topics = syllabus_topic_list.get(subject, [])
+        
+        if isinstance(question_paper_topics[subject], dict):
+            topics_dict = question_paper_topics[subject]
+        elif isinstance(question_paper_topics[subject], list):
+            # Convert list to dict
+            topics_dict = {}
+            for item in question_paper_topics[subject]:
+                if isinstance(item, dict):
+                    topic_name = item.get('topic', '')
+                    count = item.get('count', 1)
+                    topics_dict[topic_name] = count
                 else:
-                    syllabus_match = 0.5
+                    topics_dict[str(item)] = 1
+        else:
+            continue
             
-            probability = calculate_prediction_probability(count, num_papers, syllabus_match)
+        for topic, count in topics_dict.items():
+            if not topic:
+                continue
+                
+            # Check if topic is in syllabus
+            topic_lower = str(topic).lower()
+            syllabus_match = 0.0
             
-            # Lower threshold to 30% to get more predictions
-            if probability >= 30:
-                predictions.append({
-                    'subject': subject,
-                    'topic': topic.title() if topic else 'Unknown',
-                    'frequency': count,
-                    'probability': round(probability, 1),
-                    'question_type': 'MCQ (1 mark)' if probability > 70 else 'MCQ (2 marks)'
-                })
+            # Check exact match
+            if topic_lower in syllabus_subject_topics:
+                syllabus_match = 1.0
+            # Check partial match
+            elif syllabus_subject_topics:
+                for syl_topic in syllabus_subject_topics:
+                    if topic_lower in syl_topic or syl_topic in topic_lower:
+                        syllabus_match = 0.8
+                        break
+            
+            # Calculate probability
+            if syllabus_match > 0:
+                # High probability if in syllabus
+                probability = 70.0 + (syllabus_match * 20) + min(count * 2, 10)
+            else:
+                # Lower probability if not in syllabus but appeared in QP
+                probability = 50.0 + min(count * 3, 20)
+            
+            probability = min(round(probability, 1), 99.0)
+            
+            # Include all topics, not just high probability ones
+            predictions.append({
+                'subject': subject,
+                'topic': topic.title() if isinstance(topic, str) else str(topic).title(),
+                'frequency': count,
+                'probability': probability,
+                'question_type': 'MCQ (1 mark)' if probability > 75 else 'MCQ (2 marks)'
+            })
     
-    # Sort by probability
-    predictions.sort(key=lambda x: x['probability'], reverse=True)
+    # Sort by probability (syllabus matches first)
+    predictions.sort(key=lambda x: (x['probability'], x['frequency']), reverse=True)
     
-    # Return top 20, or all if less than 20
-    return predictions[:20]
+    # Return top 30 predictions
+    return predictions[:30]
 
 @app.route('/api/upload/syllabus', methods=['POST'])
 def upload_syllabus():

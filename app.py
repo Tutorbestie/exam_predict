@@ -49,7 +49,17 @@ def extract_text_from_pdf(file_path):
         with open(file_path, 'rb') as file:
             pdf_reader = PyPDF2.PdfReader(file)
             for page in pdf_reader.pages:
-                text += page.extract_text()
+                page_text = page.extract_text()
+                # Skip instruction pages (usually first or last page with specific keywords)
+                lower_text = page_text.lower()
+                instruction_keywords = ['instructions to candidates', 'time allowed', 'maximum marks', 'total marks', 'printed pages', 'roll no']
+                match_count = sum(1 for kw in instruction_keywords if kw in lower_text)
+                
+                if match_count >= 2 and len(lower_text) < 1000:
+                    # Likely an instruction page
+                    continue
+                    
+                text += page_text
     except Exception as e:
         print(f"Error extracting PDF: {e}")
     return text
@@ -99,9 +109,13 @@ def extract_topics_from_syllabus(text):
             match = re.match(r'^[\d\.•\-\*\(\)a-z\)]+[\.\)]\s*(.+)', line)
             if match:
                 topic = match.group(1).strip()
-                # Clean up topic name
                 topic = re.sub(r'^\d+[\.\)]\s*', '', topic)
                 topic = re.sub(r'^[•\-\*]\s*', '', topic)
+                
+                # Filter out structural headers
+                if re.match(r'^(?:Module|Unit|Chapter|Section|Part)\s*\d+', topic, re.IGNORECASE):
+                    continue
+                    
                 if len(topic) > 5 and len(topic) < 150:
                     topics_found.append(topic)
         # Match lines that start with capital letters and contain subject-like terms
@@ -147,6 +161,25 @@ def extract_keywords_from_text(text):
             all_keywords[word] = count
     
     return all_keywords
+
+def clean_topic_name(topic):
+    """Clean and validate topic name"""
+    if not topic:
+        return None
+    
+    # Remove common artifacts
+    topic = str(topic).strip()
+    topic = re.sub(r'^\d+[\.\)]\s*', '', topic)
+    
+    # Skip if it's just a structural header
+    if re.match(r'^(?:Module|Unit|Chapter|Section|Part)\s*\d+$', topic, re.IGNORECASE):
+        return None
+        
+    # Skip if too short or too long
+    if len(topic) < 3 or len(topic) > 150:
+        return None
+        
+    return topic
 
 def identify_subjects(text):
     """Identify subjects and topics from text - extract actual topics from syllabus"""
@@ -220,7 +253,31 @@ def identify_subjects(text):
                 topic_mapping[matched_subject].append({'topic': kw.title(), 'count': cnt})
                 subject_counts[matched_subject] += cnt
     
-    return subject_counts, topic_mapping
+    return subject_counts, topic_mapping, question_patterns
+
+def format_question(topic, count):
+    """Format a topic into a realistic question"""
+    topic = str(topic).strip()
+    
+    # Check if it already looks like a question
+    if '?' in topic or topic.lower().startswith(('what', 'define', 'explain', 'describe', 'compare')):
+        return topic
+        
+    start_phrases = [
+        "Explain the concept of {} in detail.",
+        "What is {}? Discuss its verification properties.",
+        "Write a short note on {}.",
+        "Describe the working principle of {}.",
+        "Compare and contrast {} with its alternatives.",
+        "Discuss the importance of {}."
+    ]
+    
+    # Deterministic but varied choice based on topic hash
+    import hashlib
+    hash_val = int(hashlib.md5(topic.encode()).hexdigest(), 16)
+    phrase = start_phrases[hash_val % len(start_phrases)]
+    
+    return phrase.format(topic)
 
 def analyze_question_patterns(question_papers):
     """Analyze patterns across multiple question papers - uses actual data"""
@@ -234,7 +291,10 @@ def analyze_question_patterns(question_papers):
             continue
             
         # Extract topics from this paper
-        subjects, topics = identify_subjects(text)
+        subjects, topics, questions = identify_subjects(text)
+        
+        # Collect extracted questions if any
+        # (This could be stored globally or per paper, but for now we just use topics)
         
         # Count questions in the paper
         question_count = len(re.findall(r'(?:Q|Question)\s*\d+', text, re.IGNORECASE))
@@ -334,7 +394,8 @@ def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
                         if topic_name:
                             predictions.append({
                                 'subject': subject,
-                                'topic': topic_name.title() if isinstance(topic_name, str) else str(topic_name),
+                                'topic': topic_name.title(),
+                                'question': format_question(topic_name, 1),
                                 'frequency': topic_item.get('count', 1) if isinstance(topic_item, dict) else 1,
                                 'probability': 85.0,  # High probability for syllabus topics
                                 'question_type': 'MCQ (1 mark)'
@@ -393,12 +454,17 @@ def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
             probability = min(round(probability, 1), 99.0)
             
             # Include all topics, not just high probability ones
+            clean_topic = clean_topic_name(topic)
+            if not clean_topic:
+                continue
+                
             predictions.append({
                 'subject': subject,
-                'topic': topic.title() if isinstance(topic, str) else str(topic).title(),
+                'topic': clean_topic.title(),
+                'question': format_question(clean_topic, count),
                 'frequency': count,
                 'probability': probability,
-                'question_type': 'MCQ (1 mark)' if probability > 75 else 'MCQ (2 marks)'
+                'question_type': 'Descriptive' if probability > 70 else 'Short Answer'
             })
     
     # Sort by probability (syllabus matches first)
@@ -427,7 +493,7 @@ def upload_syllabus():
         
         # Extract text and analyze
         text = extract_text(filepath)
-        subjects, topics = identify_subjects(text)
+        subjects, topics, questions = identify_subjects(text)
         
         analysis_data['syllabus'] = {
             'filename': filename,
@@ -468,7 +534,7 @@ def upload_question_papers():
             
             # Extract text and analyze
             text = extract_text(filepath)
-            subjects, topics = identify_subjects(text)
+            subjects, topics, questions = identify_subjects(text)
             
             paper_data = {
                 'filename': filename,
@@ -507,7 +573,7 @@ def analyze_data():
         if has_syllabus:
             syllabus_text = analysis_data['syllabus'].get('text', '')
             if syllabus_text:
-                subjects, topics = identify_subjects(syllabus_text)
+                subjects, topics, questions = identify_subjects(syllabus_text)
                 # Convert to all_topics format
                 for subject, topic_list in topics.items():
                     all_topics[subject] = {}
@@ -650,6 +716,7 @@ def predict_questions():
                     predictions.append({
                         'subject': subject,
                         'topic': topic.title() if topic else 'General Topic',
+                        'question': format_question(topic, count),
                         'frequency': count,
                         'probability': min(round(60 + (count * 2), 1), 99),
                         'question_type': 'MCQ (1 mark)'
@@ -662,6 +729,7 @@ def predict_questions():
                         predictions.append({
                             'subject': subject,
                             'topic': topic_name.title(),
+                            'question': format_question(topic_name, count),
                             'frequency': count,
                             'probability': min(round(60 + (count * 2), 1), 99),
                             'question_type': 'MCQ (1 mark)'

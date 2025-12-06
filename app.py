@@ -62,7 +62,7 @@ def extract_text_from_pdf(file_path):
                 text += page_text
     except Exception as e:
         print(f"Error extracting PDF: {e}")
-    return text
+    return clean_text(text)
 
 def extract_text_from_docx(file_path):
     """Extract text from DOCX file"""
@@ -83,7 +83,7 @@ def extract_text_from_txt(file_path):
             text = file.read()
     except Exception as e:
         print(f"Error extracting TXT: {e}")
-    return text
+    return clean_text(text)
 
 def extract_text(file_path):
     """Extract text based on file extension"""
@@ -95,6 +95,38 @@ def extract_text(file_path):
     elif ext == 'txt':
         return extract_text_from_txt(file_path)
     return ""
+
+def clean_text(text):
+    """Clean extracted text by removing administrative lines"""
+    cleaned_lines = []
+    lines = text.split('\n')
+    
+    # Phrases that indicate administrative/instructional content
+    IGNORE_PHRASES = [
+        'time allowed', 'maximum marks', 'total marks', 'printed pages', 
+        'roll no', 'candidate name', 'invigilator', 'semester', 
+        'examination', 'university', 'college', 'course code',
+        'reg no', 'date of exam', 'page', 'instructions'
+    ]
+    
+    for line in lines:
+        line_lower = line.lower().strip()
+        
+        # Skip empty lines
+        if not line_lower:
+            continue
+            
+        # Skip lines with administrative keywords
+        if any(phrase in line_lower for phrase in IGNORE_PHRASES):
+            continue
+            
+        # Skip short lines that are just numbers or single words
+        if len(line_lower) < 4 and not line_lower.isalpha():
+            continue
+            
+        cleaned_lines.append(line)
+        
+    return '\n'.join(cleaned_lines)
 
 def extract_topics_from_syllabus(text):
     """Extract actual topics from syllabus by looking for structured content"""
@@ -139,7 +171,10 @@ def extract_topics_from_syllabus(text):
 def extract_keywords_from_text(text):
     """Extract important keywords/phrases from text as topics"""
     # Remove common words
-    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'question', 'answer', 'following', 'given', 'find', 'calculate', 'determine', 'solve'}
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'question', 'answer', 'following', 'given', 'find', 'calculate', 'determine', 'solve', 'explain', 'describe', 'discuss', 'short', 'note', 'write', 'mark', 'marks'}
+    
+    # Blocklist for administrative terms
+    BLOCKLIST = {'university', 'examination', 'semester', 'degree', 'btech', 'mtech', 'bsc', 'msc', 'diploma', 'syllabus', 'paper', 'code', 'reg', 'roll', 'name', 'date', 'time', 'max', 'min', 'total', 'page', 'printed', 'valid', 'invalid', 'section', 'part', 'module', 'unit', 'chapter'}
     
     # Extract meaningful phrases (3-6 words) that are likely topics
     # Look for capitalized phrases
@@ -148,7 +183,7 @@ def extract_keywords_from_text(text):
     
     # Extract words
     words = re.findall(r'\b[a-z]{4,}\b', text.lower())
-    filtered_words = [w for w in words if w not in stop_words and len(w) > 4]
+    filtered_words = [w for w in words if w not in stop_words and w not in BLOCKLIST and len(w) > 4]
     word_freq = Counter(filtered_words)
     
     # Combine
@@ -187,17 +222,20 @@ def identify_subjects(text):
     syllabus_topics, question_patterns = extract_topics_from_syllabus(text)
     
     # Subject keywords for categorization
+    # Updated Subject keywords - strictly non-overlapping
     subject_keywords = {
-        'Mathematics': ['algebra', 'calculus', 'geometry', 'trigonometry', 'statistics', 'probability', 'differential', 'linear', 'equation', 'matrix', 'derivative', 'integral', 'function', 'theorem', 'proof'],
-        'Reasoning': ['logical', 'verbal', 'reasoning', 'analytical', 'seating', 'arrangement', 'blood', 'relations', 'coding', 'decoding', 'puzzle'],
-        'English': ['grammar', 'vocabulary', 'comprehension', 'reading', 'sentence', 'synonyms', 'antonyms', 'passage', 'essay', 'writing'],
-        'General Knowledge': ['history', 'geography', 'polity', 'economy', 'current', 'affairs', 'science', 'awareness', 'government'],
-        'Quantitative Aptitude': ['time', 'work', 'speed', 'distance', 'percentage', 'profit', 'loss', 'interest', 'ratio', 'proportion', 'interpretation'],
-        'Electrical Engineering': ['network', 'theorem', 'circuit', 'electrical', 'machine', 'power', 'system', 'control', 'electromagnetic', 'analog', 'digital', 'electronics', 'signal', 'transformer', 'motor', 'generator'],
-        'Civil Engineering': ['structural', 'analysis', 'strength', 'material', 'fluid', 'mechanics', 'surveying', 'concrete', 'geotechnical', 'transportation', 'environmental', 'beam', 'column', 'foundation'],
-        'Mechanical Engineering': ['thermodynamics', 'heat', 'transfer', 'fluid', 'manufacturing', 'process', 'theory', 'machine', 'design', 'mechanics', 'engine', 'pump'],
-        'Computer Science': ['data', 'structure', 'algorithm', 'operating', 'system', 'database', 'network', 'programming', 'software', 'intelligence', 'array', 'tree', 'graph'],
-        'Electronics Engineering': ['analog', 'digital', 'electronics', 'microprocessor', 'communication', 'vlsi', 'embedded', 'signal', 'processing', 'semiconductor']
+        'Mathematics': ['algebra', 'trigonometry', 'differential', 'integral', 'matrix', 'matrices', 'eigen', 'vector', 'theorem', 'laplace', 'fourier', 'calculus'],
+        'Reasoning': ['seating arrangement', 'blood relation', 'coding decoding', 'syllogism', 'puzzles', 'data sufficiency'],
+        'English': ['synonym', 'antonym', 'comprehension', 'vocabulary', 'grammar', 'essay', 'precis'],
+        'General Knowledge': ['current affairs', 'history of india', 'indian polity', 'indian economy', 'geography of india'],
+        'Quantitative Aptitude': ['profit and loss', 'simple interest', 'compound interest', 'time and work', 'speed and distance'],
+        
+        # Engineering - Specific Technical Terms
+        'Electrical Engineering': ['kirchhoff', 'thevenin', 'norton', 'superposition', 'transformer', 'induction motor', 'synchronous', 'generator', 'transmission line', 'switchgear', 'power system', 'circuit breaker'],
+        'Civil Engineering': ['concrete', 'cement', 'soil mechanics', 'fluid mechanics', 'surveying', 'structural analysis', 'reinforced', 'beam', 'column', 'foundation', 'hydrology'],
+        'Mechanical Engineering': ['thermodynamics', 'rankine', 'otto cycle', 'diesel cycle', 'refrigeration', 'fluid dynamics', 'manufacturing', 'welding', 'casting', 'gears'],
+        'Computer Science': ['algorithm', 'data structure', 'operating system', 'database', 'sql', 'compiler', 'network', 'protocol', 'stack', 'queue', 'linked list'],
+        'Electronics Engineering': ['semiconductor', 'transistor', 'op-amp', 'oscillator', 'microprocessor', 'digital logic', 'embedded system', 'vlsi', 'analog circuit']
     }
     
     text_lower = text.lower()
@@ -212,14 +250,24 @@ def identify_subjects(text):
         max_matches = 0
         
         for subject, keywords in subject_keywords.items():
+            # Require stronger matches for classification
             matches = sum(1 for kw in keywords if kw in topic_lower)
-            if matches > max_matches:
-                max_matches = matches
-                matched_subject = subject
+            if matches > 0:
+                # Weighted matching: Technical subjects need fewer keywords than General ones if the keywords are unique
+                if subject in ['Mathematics', 'Reasoning', 'General Knowledge', 'English', 'Quantitative Aptitude']:
+                     if matches > max_matches: # Require robust match
+                        max_matches = matches
+                        matched_subject = subject
+                else:
+                    # Technical subjects match easier with specific keywords
+                    if matches >= 1:
+                        max_matches = matches + 1 # Boost preference
+                        matched_subject = subject
         
-        # If no match, assign to General
+        # If no match, assign to "Detected Topics" instead of General
         if not matched_subject:
-            matched_subject = 'General Topics'
+            # Check context from earlier - if we established a subject, use it? For now, flexible fallback.
+            matched_subject = 'Detected Topics'
         
         if matched_subject not in topic_mapping:
             topic_mapping[matched_subject] = []
@@ -244,7 +292,7 @@ def identify_subjects(text):
                         break
                 
                 if not matched_subject:
-                    matched_subject = 'General Topics'
+                    matched_subject = 'Detected Topics'
                 
                 if matched_subject not in topic_mapping:
                     topic_mapping[matched_subject] = []

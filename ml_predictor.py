@@ -1,12 +1,17 @@
 import re
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from collections import Counter
 
 class ExamPredictor:
     def __init__(self):
-        self.vectorizer = TfidfVectorizer(stop_words='english', min_df=1, ngram_range=(1, 2))
+        # Lazy load sklearn components
+        self.vectorizer = None
+        
+    def _get_vectorizer(self):
+        if self.vectorizer is None:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            self.vectorizer = TfidfVectorizer(stop_words='english', min_df=1, ngram_range=(1, 2))
+        return self.vectorizer
         
     def preprocess_text(self, text):
         """Clean and normalize text for vectorization"""
@@ -45,7 +50,8 @@ class ExamPredictor:
         corpus = [self.preprocess_text(past_questions_text)] + clean_topics
         
         try:
-            tfidf_matrix = self.vectorizer.fit_transform(corpus)
+            vectorizer = self._get_vectorizer()
+            tfidf_matrix = vectorizer.fit_transform(corpus)
         except ValueError:
             # Handle empty vocabulary case
             return []
@@ -55,6 +61,7 @@ class ExamPredictor:
         # tfidf_matrix[1:] is (n_topics, n_features)
         
         # We want similarity of each topic TO the paper
+        from sklearn.metrics.pairwise import cosine_similarity
         cosine_sim = cosine_similarity(tfidf_matrix[1:], tfidf_matrix[0:1]) # Result is (n_topics, 1)
         
         predictions = []

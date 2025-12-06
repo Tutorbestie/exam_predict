@@ -9,7 +9,7 @@ from datetime import datetime
 import numpy as np
 import re
 from collections import Counter
-from ml_predictor import ExamPredictor
+# Lazy import ExamPredictor within functions to save memory on startup
 
 app = Flask(__name__)
 CORS(app)
@@ -446,6 +446,7 @@ def analyze_question_patterns(question_papers):
             
     # Use ML predictor for difficulty distribution
     try:
+        from ml_predictor import ExamPredictor
         predictor = ExamPredictor()
         all_text = ' '.join([paper.get('text', '') for paper in question_papers])
         difficulty_distribution = predictor.get_difficulty_distribution(all_text)
@@ -488,6 +489,7 @@ def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
     ml_predictions = []
     
     try:
+        from ml_predictor import ExamPredictor
         predictor = ExamPredictor()
         
         # If no QP text but we have syllabus, we can't do similarity. 

@@ -73,7 +73,7 @@ def extract_text_from_docx(file_path):
             text += paragraph.text + "\n"
     except Exception as e:
         print(f"Error extracting DOCX: {e}")
-    return text
+    return clean_text(text)
 
 def extract_text_from_txt(file_path):
     """Extract text from TXT file"""

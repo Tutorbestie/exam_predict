@@ -580,11 +580,11 @@ def analyze_data():
                     for topic_item in topic_list:
                         topic_name = topic_item['topic']
                         all_topics[subject][topic_name] = topic_item['count']
-                # Generate random difficulty distribution
+                # Generate random difficulty distribution -> Default to even if no data
                 difficulty_dist = {
-                    'Easy': np.random.randint(20, 40),
-                    'Medium': np.random.randint(30, 50),
-                    'Hard': np.random.randint(10, 30)
+                    'Easy': 34,
+                    'Medium': 33,
+                    'Hard': 33
                 }
     
     # Calculate syllabus coverage (if syllabus exists)
@@ -599,19 +599,19 @@ def analyze_data():
                     covered = len(all_topics[subject])
                     total = len(syllabus_topics.get(subject, []))
                     if total > 0:
-                        coverage[subject] = round((covered / max(total, 1)) * 100, 1)
+                        coverage[subject] = min(round((covered / max(total, 1)) * 100, 1), 100.0)
                     else:
-                        coverage[subject] = round(np.random.uniform(60, 95), 1)
+                        coverage[subject] = 0.0
                 else:
-                    coverage[subject] = 0
+                    coverage[subject] = 0.0
         else:
             # If no predefined subjects, create coverage from all_topics
             for subject in all_topics.keys():
-                coverage[subject] = round(np.random.uniform(70, 95), 1)
+                coverage[subject] = 0.0  # Cannot calculate coverage without syllabus matched topics
     else:
         # If no syllabus, create coverage from question paper topics
         for subject in all_topics.keys():
-            coverage[subject] = round(np.random.uniform(70, 95), 1)
+            coverage[subject] = 0.0  # No syllabus to compare against
     
     # Get top topics by frequency
     topic_frequency = []
@@ -697,8 +697,10 @@ def predict_questions():
         
         if text_to_analyze:
             keywords = extract_keywords_from_text(text_to_analyze)
-            question_paper_topics = {'General': dict(list(keywords.items())[:20])}
-            analysis_data['topics'] = question_paper_topics
+            # Only use if we actually found keywords
+            if keywords:
+                question_paper_topics = {'General': dict(list(keywords.items())[:20])}
+                analysis_data['topics'] = question_paper_topics
     
     # Debug info
     print(f"Generating predictions - Syllabus: {has_syllabus}, QP: {has_question_papers}")

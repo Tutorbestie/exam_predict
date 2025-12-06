@@ -106,7 +106,12 @@ def clean_text(text):
         'time allowed', 'maximum marks', 'total marks', 'printed pages', 
         'roll no', 'candidate name', 'invigilator', 'semester', 
         'examination', 'university', 'college', 'course code',
-        'reg no', 'date of exam', 'page', 'instructions'
+        'reg no', 'date of exam', 'page', 'instructions',
+        'omr', 'duration', 'hours', 'minutes', 'calculator', 'mobile',
+        'electronic', 'programmable', 'communicating', 'device',
+        'hall ticket', 'signature', 'blue', 'black', 'ink', 'pen', 'pencil',
+        'do not', 'attempt any', 'all questions carry', 'equal marks',
+        'section', 'part', 'compulsory', 'optional'
     ]
     
     for line in lines:
@@ -128,6 +133,37 @@ def clean_text(text):
         
     return '\n'.join(cleaned_lines)
 
+def is_valid_topic(text):
+    """Check if the text looks like a valid academic topic"""
+    text = str(text).strip()
+    text_lower = text.lower()
+    
+    # Too short or too long
+    if len(text) < 3 or len(text) > 150:
+        return False
+        
+    # Purely numbers or symbols
+    if not re.search(r'[a-zA-Z]', text):
+        return False
+        
+    # Starts with a verb typical of instructions (but allow Question-like verbs)
+    instruction_verbs = ['do', 'use', 'write', 'attempt', 'answer', 'fill', 'tick', 'mark', 'read', 'note']
+    # Question verbs we WANT to keep
+    question_verbs = ['explain', 'define', 'describe', 'what', 'why', 'how', 'compare', 'discuss', 'calculate', 'find']
+    
+    first_word = text_lower.split()[0]
+    if first_word in instruction_verbs and first_word not in question_verbs:
+         # Double check it's not "Write a note on..." which is a question
+        if 'note on' not in text_lower:
+            return False
+            
+    # Contains banned words/phrases (redundant with clean_text but good for topic granularity)
+    BANNED_KA_TOKENS = ['marks', 'hours', 'minutes', 'page', 'section', 'part', 'unit', 'module', 'chapter', 'question paper', 'serial no']
+    if any(token in text_lower for token in BANNED_KA_TOKENS):
+        return False
+        
+    return True
+
 def extract_topics_from_syllabus(text):
     """Extract actual topics from syllabus by looking for structured content"""
     topics_found = []
@@ -148,12 +184,12 @@ def extract_topics_from_syllabus(text):
                 if re.match(r'^(?:Module|Unit|Chapter|Section|Part)\s*\d+', topic, re.IGNORECASE):
                     continue
                     
-                if len(topic) > 5 and len(topic) < 150:
+                if is_valid_topic(topic):
                     topics_found.append(topic)
         # Match lines that start with capital letters and contain subject-like terms
         elif re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*', line) and len(line) < 150:
             # Check if it looks like a topic (not too long, not too short, contains letters)
-            if 10 < len(line) < 150 and line[0].isupper():
+            if 10 < len(line) < 150 and line[0].isupper() and is_valid_topic(line):
                 topics_found.append(line)
     
     # Also extract from question papers - look for question patterns
@@ -163,8 +199,10 @@ def extract_topics_from_syllabus(text):
         line = line.strip()
         if re.match(r'^(?:Q|Question)\s*\d+[\.\):]?\s*(.+)', line, re.IGNORECASE):
             match = re.match(r'^(?:Q|Question)\s*\d+[\.\):]?\s*(.+)', line, re.IGNORECASE)
-            if match and len(match.group(1)) > 10:
-                question_patterns.append(match.group(1)[:100])
+            if match:
+                q_text = match.group(1).strip()
+                if len(q_text) > 10 and is_valid_topic(q_text):
+                    question_patterns.append(q_text[:150])
     
     return topics_found, question_patterns
 
@@ -210,8 +248,8 @@ def clean_topic_name(topic):
     if re.match(r'^(?:Module|Unit|Chapter|Section|Part)\s*\d+$', topic, re.IGNORECASE):
         return None
         
-    # Skip if too short or too long
-    if len(topic) < 3 or len(topic) > 150:
+    # Skip if too short or too long or invalid
+    if not is_valid_topic(topic):
         return None
         
     return topic

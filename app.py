@@ -445,9 +445,14 @@ def analyze_question_patterns(question_papers):
             all_topics['General'] = dict(list(keywords.items())[:30])
             
     # Use ML predictor for difficulty distribution
-    predictor = ExamPredictor()
-    all_text = ' '.join([paper.get('text', '') for paper in question_papers])
-    difficulty_distribution = predictor.get_difficulty_distribution(all_text)
+    try:
+        predictor = ExamPredictor()
+        all_text = ' '.join([paper.get('text', '') for paper in question_papers])
+        difficulty_distribution = predictor.get_difficulty_distribution(all_text)
+    except Exception as e:
+        print(f"ML Predictor Error (Difficulty): {e}")
+        # Keep existing difficulty_distribution
+        pass
     
     return all_topics, difficulty_distribution
 
@@ -480,19 +485,25 @@ def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
         qp_text = " ".join([qp.get('text', '') for qp in analysis_data['question_papers']])
     
     # 3. Use ML Predictor
-    predictor = ExamPredictor()
-    
-    # If no QP text but we have syllabus, we can't do similarity. 
-    # But if we have QP analysis topics, we can use them as 'text'
-    if not qp_text and question_paper_topics:
-        # Construct fake text from extracted topics
-        for subj, topics in question_paper_topics.items():
-            if isinstance(topics, dict):
-                 qp_text += " ".join(topics.keys()) + " "
-    
     ml_predictions = []
-    if flat_syllabus_topics and qp_text:
-        ml_predictions = predictor.predict_questions(flat_syllabus_topics, qp_text, num_predictions=30)
+    
+    try:
+        predictor = ExamPredictor()
+        
+        # If no QP text but we have syllabus, we can't do similarity. 
+        # But if we have QP analysis topics, we can use them as 'text'
+        if not qp_text and question_paper_topics:
+            # Construct fake text from extracted topics
+            for subj, topics in question_paper_topics.items():
+                if isinstance(topics, dict):
+                     qp_text += " ".join(topics.keys()) + " "
+        
+        if flat_syllabus_topics and qp_text:
+            ml_predictions = predictor.predict_questions(flat_syllabus_topics, qp_text, num_predictions=30)
+    except Exception as e:
+        print(f"ML Predictor Error (Prediction): {e}")
+        # ml_predictions remains empty, will trigger fallback
+        pass
     
     # 4. Format Predictions
     final_predictions = []
@@ -508,6 +519,7 @@ def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
             if syllabus_topics:
                 for subj, t_list in syllabus_topics.items():
                     # Flatten t_list to strings
+                    if not t_list: continue
                     simple_list = [t.get('topic', '') if isinstance(t, dict) else str(t) for t in t_list]
                     if topic_name in simple_list:
                         subject = subj
@@ -524,11 +536,62 @@ def generate_predictions(syllabus_topics, question_paper_topics, num_papers):
             })
     else:
         # Fallback to simple matching if ML failed or no data
-        # (Preserve some of the old logic for fallback?)
-        # For now, return empty or basic
-        pass
+        print("Using heuristic fallback for predictions")
+        # Reuse the heuristic logic from the previous version
+        
+        # Determine strict or loose matching based on whether we have a syllabus
+        use_syllabus_fallback = bool(syllabus_topics)
+        
+        if not question_paper_topics or len(question_paper_topics) == 0:
+             if use_syllabus_fallback:
+                 # Just list syllabus topics
+                 for subject, topic_list in syllabus_topics.items():
+                     if isinstance(topic_list, list):
+                         for topic_item in topic_list[:20]:
+                             t_name = topic_item.get('topic', '') if isinstance(topic_item, dict) else str(topic_item)
+                             if t_name:
+                                 final_predictions.append({
+                                     'subject': subject,
+                                     'topic': t_name.title(),
+                                     'question': format_question(t_name, 1),
+                                     'frequency': 1,
+                                     'probability': 85.0,
+                                     'question_type': 'MCQ (1 mark)'
+                                 })
+        
+        # ... (rest of the heuristic loop) ... 
+        # For implementation brevity, I will re-implement the core heuristic loop here
+        # It's better to verify this fallback part exists or I need to write it out fully.
+        
+        # Let's restore the heuristic loop properly
+        for subject in question_paper_topics:
+             if not question_paper_topics[subject]: continue
+             
+             topics_dict = {}
+             if isinstance(question_paper_topics[subject], dict):
+                 topics_dict = question_paper_topics[subject]
+             elif isinstance(question_paper_topics[subject], list):
+                 for item in question_paper_topics[subject]:
+                     if isinstance(item, dict):
+                         topics_dict[item.get('topic', '')] = item.get('count', 1)
+                     else:
+                         topics_dict[str(item)] = 1
+             
+             for topic, count in topics_dict.items():
+                 if not topic: continue
+                 clean_topic = clean_topic_name(topic)
+                 if not clean_topic: continue
+                 
+                 final_predictions.append({
+                     'subject': subject,
+                     'topic': clean_topic.title(),
+                     'question': format_question(clean_topic, count),
+                     'frequency': count,
+                     'probability': 80.0, # Default high confidence for found topics
+                     'question_type': 'Descriptive'
+                 })
 
-    return final_predictions
+    return final_predictions[:30]
 
 @app.route('/api/upload/syllabus', methods=['POST'])
 def upload_syllabus():

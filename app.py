@@ -112,7 +112,8 @@ def clean_text(text):
         'electronic', 'programmable', 'communicating', 'device',
         'hall ticket', 'signature', 'blue', 'black', 'ink', 'pen', 'pencil',
         'do not', 'attempt any', 'all questions carry', 'equal marks',
-        'section', 'part', 'compulsory', 'optional'
+        'section', 'part', 'compulsory', 'optional',
+        'rough work', 'end of paper', 'blank page', 'question paper code'
     ]
     
     for line in lines:
@@ -154,8 +155,13 @@ def is_valid_topic(text):
     
     first_word = text_lower.split()[0]
     if first_word in instruction_verbs and first_word not in question_verbs:
-         # Double check it's not "Write a note on..." which is a question
-        if 'note on' not in text_lower:
+        # Allow "Write" if it describes a technical output
+        if first_word == 'write' and any(kw in text_lower for kw in ['program', 'code', 'function', 'algorithm', 'note', 'script', 'query', 'syntax']):
+            pass
+        # Double check it's not "Write a note on..." which is a question
+        elif 'note on' in text_lower:
+            pass
+        else:
             return False
             
     # Contains banned words/phrases (redundant with clean_text but good for topic granularity)
@@ -263,18 +269,18 @@ def identify_subjects(text):
     # Subject keywords for categorization
     # Updated Subject keywords - strictly non-overlapping
     subject_keywords = {
-        'Mathematics': ['algebra', 'trigonometry', 'differential', 'integral', 'matrix', 'matrices', 'eigen', 'vector', 'theorem', 'laplace', 'fourier', 'calculus'],
-        'Reasoning': ['seating arrangement', 'blood relation', 'coding decoding', 'syllogism', 'puzzles', 'data sufficiency'],
-        'English': ['synonym', 'antonym', 'comprehension', 'vocabulary', 'grammar', 'essay', 'precis'],
-        'General Knowledge': ['current affairs', 'history of india', 'indian polity', 'indian economy', 'geography of india'],
-        'Quantitative Aptitude': ['profit and loss', 'simple interest', 'compound interest', 'time and work', 'speed and distance'],
+        'Mathematics': ['algebra', 'trigonometry', 'differential', 'integral', 'matrix', 'matrices', 'eigen', 'vector', 'theorem', 'laplace', 'fourier', 'calculus', 'probability', 'statistics', 'complex', 'numerical'],
+        'Reasoning': ['seating arrangement', 'blood relation', 'coding decoding', 'syllogism', 'puzzles', 'data sufficiency', 'logical', 'series', 'direction', 'ranking'],
+        'English': ['synonym', 'antonym', 'comprehension', 'vocabulary', 'grammar', 'essay', 'precis', 'idioms', 'phrases', 'correction'],
+        'General Knowledge': ['current affairs', 'history', 'polity', 'economy', 'geography', 'constitution', 'culture', 'sports', 'science'],
+        'Quantitative Aptitude': ['profit', 'loss', 'interest', 'time', 'work', 'speed', 'distance', 'ratio', 'proportion', 'average', 'percentage', 'mensuration'],
         
         # Engineering - Specific Technical Terms
-        'Electrical Engineering': ['kirchhoff', 'thevenin', 'norton', 'superposition', 'transformer', 'induction motor', 'synchronous', 'generator', 'transmission line', 'switchgear', 'power system', 'circuit breaker'],
-        'Civil Engineering': ['concrete', 'cement', 'soil mechanics', 'fluid mechanics', 'surveying', 'structural analysis', 'reinforced', 'beam', 'column', 'foundation', 'hydrology'],
-        'Mechanical Engineering': ['thermodynamics', 'rankine', 'otto cycle', 'diesel cycle', 'refrigeration', 'fluid dynamics', 'manufacturing', 'welding', 'casting', 'gears'],
-        'Computer Science': ['algorithm', 'data structure', 'operating system', 'database', 'sql', 'compiler', 'network', 'protocol', 'stack', 'queue', 'linked list'],
-        'Electronics Engineering': ['semiconductor', 'transistor', 'op-amp', 'oscillator', 'microprocessor', 'digital logic', 'embedded system', 'vlsi', 'analog circuit']
+        'Electrical Engineering': ['kirchhoff', 'thevenin', 'norton', 'superposition', 'transformer', 'induction', 'synchronous', 'generator', 'transmission', 'switchgear', 'power', 'circuit', 'voltage', 'current', 'motor'],
+        'Civil Engineering': ['concrete', 'cement', 'soil', 'fluid', 'surveying', 'structural', 'reinforced', 'beam', 'column', 'foundation', 'hydrology', 'highway', 'transportation', 'environmental'],
+        'Mechanical Engineering': ['thermodynamics', 'rankine', 'otto', 'diesel', 'refrigeration', 'fluid', 'manufacturing', 'welding', 'casting', 'gears', 'stress', 'strain', 'kinematics'],
+        'Computer Science': ['algorithm', 'data structure', 'operating system', 'database', 'sql', 'compiler', 'network', 'protocol', 'stack', 'queue', 'linked list', 'tree', 'graph', 'automata', 'cloud', 'security'],
+        'Electronics Engineering': ['semiconductor', 'transistor', 'op-amp', 'oscillator', 'microprocessor', 'digital', 'embedded', 'vlsi', 'analog', 'signal', 'communication', 'antenna', 'modulation']
     }
     
     text_lower = text.lower()

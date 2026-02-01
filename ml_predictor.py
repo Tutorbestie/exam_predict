@@ -16,8 +16,8 @@ class ExamPredictor:
     def preprocess_text(self, text):
         """Clean and normalize text for vectorization"""
         text = str(text).lower()
-        # Remove numbers and special chars, keep only letters and spaces
-        text = re.sub(r'[^a-z\s]', ' ', text)
+        # Remove special chars, keep letters, numbers and spaces
+        text = re.sub(r'[^a-z0-9\s]', ' ', text)
         # Remove multiple spaces
         text = re.sub(r'\s+', ' ', text).strip()
         return text

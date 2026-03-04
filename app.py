@@ -22,8 +22,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import hashlib
 import hmac
-import jwt
-from functools import wraps
 import time
 import threading
 from queue import Queue
@@ -1415,4 +1413,7 @@ def reset_data():
 if __name__ == '__main__':
     # Initialize the database
     init_db()
-    app.run(debug=True, port=5000)
+    # Check if running on Render or similar platform
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

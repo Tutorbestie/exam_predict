@@ -611,7 +611,10 @@ def clean_text(text):
         'hall ticket', 'signature', 'blue', 'black', 'ink', 'pen', 'pencil',
         'do not', 'attempt any', 'all questions carry', 'equal marks',
         'section', 'part', 'compulsory', 'optional',
-        'rough work', 'end of paper', 'blank page', 'question paper code'
+        'rough work', 'end of paper', 'blank page', 'question paper code',
+        'alpha code', 'serial number', 'booklet', 'seating position',
+        'facing sheet', 'top margin', 'choices', 'correct answer', 'carry marks',
+        'negative mark', 'attended questions', 'replaced', 'unnumbered'
     ]
     
     for line in lines:
@@ -621,8 +624,9 @@ def clean_text(text):
         if not line_lower:
             continue
             
-        # Skip lines with administrative keywords
-        if any(phrase in line_lower for phrase in IGNORE_PHRASES):
+        # Skip lines with administrative keywords (if too many matches)
+        admin_matches = sum(1 for phrase in IGNORE_PHRASES if phrase in line_lower)
+        if admin_matches >= 2:  # If 2 or more admin phrases in the line
             continue
             
         # Skip short lines that are just numbers or single words
@@ -642,31 +646,45 @@ def is_valid_topic(text):
     if len(text) < 3 or len(text) > 150:
         return False
         
-    # Purely numbers or symbols
-    if not re.search(r'[a-zA-Z]', text):
+    # Purely numbers or mostly numbers
+    if not re.search(r'[a-zA-Z]', text) or len(re.findall(r'\d', text)) > len(re.findall(r'[a-zA-Z]', text)):
+        return False
+        
+    # Contains specific administrative phrases
+    admin_phrases = [
+        'alpha code', 'serial number', 'booklet', 'seating position', 'facing sheet',
+        'top margin', 'choices', 'correct answer', 'carry marks', 'negative mark',
+        'attended questions', 'replaced', 'unnumbered', 'question booklet'
+    ]
+    
+    if any(phrase in text_lower for phrase in admin_phrases):
         return False
         
     # Starts with a verb typical of instructions (but allow Question-like verbs)
     instruction_verbs = ['do', 'use', 'write', 'attempt', 'answer', 'fill', 'tick', 'mark', 'read', 'note']
     # Question verbs we WANT to keep
-    question_verbs = ['explain', 'define', 'describe', 'what', 'why', 'how', 'compare', 'discuss', 'calculate', 'find']
+    question_verbs = ['explain', 'define', 'describe', 'what', 'why', 'how', 'compare', 'discuss', 'calculate', 'find', 'derive', 'prove', 'analyze', 'evaluate']
     
-    first_word = text_lower.split()[0]
+    first_word = text_lower.split()[0] if text_lower.split() else ''
     if first_word in instruction_verbs and first_word not in question_verbs:
         # Allow "Write" if it describes a technical output
-        if first_word == 'write' and any(kw in text_lower for kw in ['program', 'code', 'function', 'algorithm', 'note', 'script', 'query', 'syntax']):
-            pass
+        if first_word == 'write' and any(kw in text_lower for kw in ['program', 'code', 'function', 'algorithm', 'note', 'script', 'query', 'syntax', 'application', 'implementation']):
+            return True
         # Double check it's not "Write a note on..." which is a question
         elif 'note on' in text_lower:
-            pass
+            return True
+        # Allow if it's followed by technical terms
+        elif any(tech_term in text_lower for tech_term in ['algorithm', 'code', 'program', 'circuit', 'equation', 'formula', 'theorem']):
+            return True
         else:
             return False
             
     # Contains banned words/phrases (redundant with clean_text but good for topic granularity)
-    BANNED_KA_TOKENS = ['marks', 'hours', 'minutes', 'page', 'section', 'part', 'unit', 'module', 'chapter', 'question paper', 'serial no']
+    BANNED_KA_TOKENS = ['marks', 'hours', 'minutes', 'page', 'section', 'part', 'unit', 'module', 'chapter', 'question paper', 'serial no', 'booklet', 'alpha', 'code']
     if any(token in text_lower for token in BANNED_KA_TOKENS):
         return False
         
+    # If it passes all checks, it's a valid topic
     return True
 
 def extract_topics_from_syllabus(text):
@@ -677,37 +695,52 @@ def extract_topics_from_syllabus(text):
     # Look for numbered/bulleted lists (common in syllabi)
     for line in text_lines:
         line = line.strip()
-        # Match patterns like: "1. Topic Name", "• Topic", "- Topic", "(a) Topic"
-        if re.match(r'^[\d\.•\-\*\(\)a-z\)]+[\.\)]\s*([A-Z][^\n]{5,100})', line):
-            match = re.match(r'^[\d\.•\-\*\(\)a-z\)]+[\.\)]\s*(.+)', line)
+        if not line:
+            continue  # Skip empty lines
+            
+        # Enhanced pattern matching for various list formats
+        if re.match(r'^[\d\(\)\.\-•a-zA-Z]+\s+([A-Z][^\n]{5,150})', line):
+            match = re.match(r'^[\d\(\)\.\-•a-zA-Z]+\s+(.+)', line)
             if match:
                 topic = match.group(1).strip()
-                topic = re.sub(r'^\d+[\.\)]\s*', '', topic)
-                topic = re.sub(r'^[•\-\*]\s*', '', topic)
+                # Remove common list markers
+                topic = re.sub(r'^[\d\.\-•)]+\s*', '', topic)
+                topic = re.sub(r'^[a-zA-Z]\)\s*', '', topic)
                 
-                # Filter out structural headers
-                if re.match(r'^(?:Module|Unit|Chapter|Section|Part)\s*\d+', topic, re.IGNORECASE):
+                # Filter out structural headers and administrative content
+                if re.match(r'^(?:Module|Unit|Chapter|Section|Part|Page|Total|Time|Marks|Hours|Duration|Roll|Date|Instructions?|Note|Answer|All|Questions?|Carry|Select|Write|Attempt|Choose|This|Paper|Code|Reg|Semester|University|College)\b', topic, re.IGNORECASE):
                     continue
-                    
+                
+                # Better topic validation with length and content checks
                 if is_valid_topic(topic):
                     topics_found.append(topic)
+        
         # Match lines that start with capital letters and contain subject-like terms
-        elif re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*', line) and len(line) < 150:
-            # Check if it looks like a topic (not too long, not too short, contains letters)
-            if 10 < len(line) < 150 and line[0].isupper() and is_valid_topic(line):
-                topics_found.append(line)
+        elif re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+', line) and len(line) < 200:
+            # Enhanced validation for topic-like lines
+            if 15 < len(line) < 180 and line[0].isupper() and is_valid_topic(line):
+                # Additional check to ensure it's not a header or instruction
+                if not re.search(r'(?:Write|Attempt|Answer|Note|Instructions?|Time|Marks|Duration|All|Questions?|Carry|Select|Choose|This|Paper|Code|Reg|Semester|University|College)', line, re.IGNORECASE):
+                    topics_found.append(line)
 
-    # Also extract from question papers - look for question patterns
+    # Enhanced extraction from question patterns
     question_patterns = []
-    # Match questions like "Q1. What is...", "Question 1:", etc.
+    # Match questions with various formats
     for line in text_lines:
         line = line.strip()
-        if re.match(r'^(?:Q|Question)\s*\d+[\.\):]?\s*(.+)', line, re.IGNORECASE):
-            match = re.match(r'^(?:Q|Question)\s*\d+[\.\):]?\s*(.+)', line, re.IGNORECASE)
+        if not line:
+            continue
+            
+        # Match multiple question formats including Q1, Question 1, 1., etc.
+        if re.match(r'^(?:Q|Question|\d)\s*[\.\)]\s*(.+)', line, re.IGNORECASE):
+            match = re.match(r'^(?:Q|Question|\d)\s*[\.\)]\s*(.+)', line, re.IGNORECASE)
             if match:
                 q_text = match.group(1).strip()
-                if len(q_text) > 10 and is_valid_topic(q_text):
-                    question_patterns.append(q_text[:150])
+                # Better validation for question content
+                if len(q_text) > 15 and is_valid_topic(q_text):
+                    # Remove trailing numbers or markers
+                    q_text = re.sub(r'\s*\d+[\.\)]?$', '', q_text)
+                    question_patterns.append(q_text[:200])
 
     return topics_found, question_patterns
 
@@ -819,7 +852,7 @@ def identify_subjects(text):
 
         # Add topic if not already there
         existing_topics = [t['topic'] for t in topic_mapping[matched_subject]]
-        if topic not in existing_topics:
+        if topic not in existing_topics and is_valid_topic(topic):
             topic_mapping[matched_subject].append({'topic': topic, 'count': 1})
             subject_counts[matched_subject] += 1
 

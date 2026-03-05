@@ -58,61 +58,66 @@ os.makedirs('models', exist_ok=True)
 # Database initialization
 def init_db():
     """Initialize the SQLite database with required tables"""
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    
-    # Users table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT UNIQUE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Uploads table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS uploads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            filename TEXT NOT NULL,
-            original_filename TEXT NOT NULL,
-            file_type TEXT NOT NULL,
-            upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            file_hash TEXT,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
-    
-    # Analysis results table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS analyses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            syllabus_id INTEGER,
-            results_json TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (syllabus_id) REFERENCES uploads (id)
-        )
-    ''')
-    
-    # Predictions table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS predictions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            analysis_id INTEGER,
-            prediction_results TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (analysis_id) REFERENCES analyses (id)
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        
+        # Users table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Uploads table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS uploads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                filename TEXT NOT NULL,
+                original_filename TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                file_hash TEXT,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+        
+        # Analysis results table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analyses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                syllabus_id INTEGER,
+                results_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                FOREIGN KEY (syllabus_id) REFERENCES uploads (id)
+            )
+        ''')
+        
+        # Predictions table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS predictions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                analysis_id INTEGER,
+                prediction_results TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                FOREIGN KEY (analysis_id) REFERENCES analyses (id)
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}")
+        raise
 
 def get_user_id():
     """Get or create user ID from session"""
@@ -125,15 +130,22 @@ def get_user_id():
         session_id = session.sid if hasattr(session, 'sid') else str(uuid.uuid4())
         
         try:
+            # First, try to insert a new user
             cursor.execute('INSERT INTO users (session_id) VALUES (?)', (session_id,))
             user_id = cursor.lastrowid
             conn.commit()
             session['user_id'] = user_id
         except sqlite3.IntegrityError:
-            # User already exists (race condition)
+            # User already exists (race condition) - fetch existing user
+            conn.rollback()  # Rollback the failed insert
             cursor.execute('SELECT id FROM users WHERE session_id = ?', (session_id,))
-            user_id = cursor.fetchone()[0]
-            session['user_id'] = user_id
+            result = cursor.fetchone()
+            if result:
+                user_id = result[0]
+                session['user_id'] = user_id
+            else:
+                # This shouldn't happen, but just in case
+                raise Exception(f"Could not retrieve user for session_id: {session_id}")
         finally:
             conn.close()
     
@@ -472,22 +484,31 @@ def index():
 
 def get_analysis_data(user_id):
     """Get analysis data for the current user from DB"""
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    
-    # Get latest analysis for this user
-    cursor.execute('''
-        SELECT results_json FROM analyses 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC LIMIT 1
-    ''', (user_id,))
-    
-    result = cursor.fetchone()
-    conn.close()
-    
-    if result:
-        return json.loads(result[0])
-    else:
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        
+        # Get latest analysis for this user
+        cursor.execute('''
+            SELECT results_json FROM analyses 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC LIMIT 1
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0]:
+            return json.loads(result[0])
+        else:
+            return {
+                'syllabus': None,
+                'question_papers': [],
+                'topics': {},
+                'patterns': {}
+            }
+    except Exception as e:
+        logger.error(f"Error retrieving analysis data for user {user_id}: {str(e)}")
         return {
             'syllabus': None,
             'question_papers': [],
@@ -497,24 +518,28 @@ def get_analysis_data(user_id):
 
 def update_analysis_data(user_id, data):
     """Update analysis data for the current user in DB"""
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    
-    # Check if we already have an analysis entry
-    cursor.execute('SELECT id FROM analyses WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', (user_id,))
-    existing = cursor.fetchone()
-    
-    results_json = json.dumps(data)
-    
-    if existing:
-        # Update existing
-        cursor.execute('UPDATE analyses SET results_json = ? WHERE id = ?', (results_json, existing[0]))
-    else:
-        # Create new
-        cursor.execute('INSERT INTO analyses (user_id, results_json) VALUES (?, ?)', (user_id, results_json))
-    
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        
+        # Check if we already have an analysis entry
+        cursor.execute('SELECT id FROM analyses WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', (user_id,))
+        existing = cursor.fetchone()
+        
+        results_json = json.dumps(data)
+        
+        if existing:
+            # Update existing
+            cursor.execute('UPDATE analyses SET results_json = ? WHERE id = ?', (results_json, existing[0]))
+        else:
+            # Create new
+            cursor.execute('INSERT INTO analyses (user_id, results_json) VALUES (?, ?)', (user_id, results_json))
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error updating analysis data for user {user_id}: {str(e)}")
+        raise
 
 def extract_text_from_pdf(file_path):
     """Extract text from PDF file"""
@@ -864,7 +889,7 @@ def analyze_question_patterns(question_papers):
         # (This could be stored globally or per paper, but for now we just use topics)
 
         # Count questions in the paper
-        question_count = len(re.findall(r'(?:Q|Question)\s*\d+', text, re.IGNORECASE))
+        question_count = len(re.findall(r'(?:Q|Question)\s*\d+[\.\):]?', text, re.IGNORECASE))
         if question_count == 0:
             # Try alternative patterns
             question_count = len(re.findall(r'\d+[\.\)]\s+[A-Z]', text)) or len(text.split('?')) - 1
@@ -1445,6 +1470,10 @@ if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
+# Initialize database when the application starts
+init_db()
 
 
 # Error handlers
